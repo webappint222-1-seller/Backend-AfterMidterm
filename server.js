@@ -17,7 +17,7 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static('public'));
 app.use(cors());
 app.use(function (req, res, next) {
-  res.header('Access-Control-Allow-Origin', "https://utastore.team");
+  res.header('Access-Control-Allow-Origin', "http://localhost:8080");
   res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
   res.header('Access-Control-Allow-Headers', 'Content-Type');
   res.header('Access-Control-Allow-Headers: Origin, Content-Type, X-Auth-Token');
@@ -30,10 +30,10 @@ app.use(function (req, res, next) {
 //   cert: fs.readFileSync('etc/cert.pem')
 // };
 
-const whitelist ="https://utastore.team";
+const whitelist ="http://localhost:8080";
 const corsOptions = {
   origin: (origin,callback,res)=> {
-    if( whitelist.indexOf(origin) !== -1){
+    if(!origin ||  whitelist.indexOf(origin) !== -1){
       callback(null, true)
     }else{
       callback(status[401] + " you dont have right to enter this page")
@@ -66,7 +66,7 @@ const storage = multer.diskStorage({
     callback(null, './public/upload')
   },
   filename: function (res, file, callback) {
-    callback(null, suff + ".png")
+    callback(null, file.originalname)
   }
 });
 
@@ -88,7 +88,7 @@ app.post('/formdataupload', multerSigleUpload.single('image'), function (req, re
     sql.connect((err) => {
       sql.query('SELECT * FROM user where user_id=' + decoded.id, function (error, results) {
         if (results[0].role == 1) {
-          var db = "INSERT INTO `product`(`product_name`, `band_name`, `price`,`product_des`,`image`) VALUES ('" + req.body.product_name + "', '" + req.body.band_name + "', '" + req.body.price + "','" + req.body.product_des + "','" + suff + ".png" + "')";
+          var db = "INSERT INTO `product`(`product_name`, `band_name`, `price`,`product_des`,`image`) VALUES ('" + req.body.product_name + "', '" + req.body.band_name + "', '" + req.body.price + "','" + req.body.product_des + "','" + req.file.originalname + "')";
           sql.query(db, function (err, result) {
             console.log('inserted data');
             console.log(db);
@@ -104,30 +104,29 @@ app.post('/formdataupload', multerSigleUpload.single('image'), function (req, re
 });
 
 app.put('/productupdate/:productId', multerSigleUpload.single('image'), function (req, res, next) {
-  if (!req.cookies['jwt']) {
-    return res.status(401).send("must login")
-  } else {
-    const theCookie = req.cookies['jwt'];
-    const decoded = jwt.verify(theCookie, 'secrect');
-    if (!decoded) {
-      return res.status(401).send("unauthebtucated")
-    }
-    sql.connect((err) => {
-      sql.query('SELECT * FROM user where user_id=' + decoded.id, function (error, results) {
-        if (results[0].role == 1) {
-          var db = "UPDATE product SET `product_name` = '" + req.body.product_name + "', `band_name` = '" + req.body.band_name + "' , `price` = '" + req.body.price + "',product_des = '" + req.body.product_des + "',image = '" + suff + ".png" + "' WHERE product_id = '" + req.params.productId + "'"
-          sql.query(db, function (err, result) {
-            console.log(db);
-            console.log(result);
-          });
-        } else {
-          return res.status(401).send("must be admin to edit product")
-        }
-      });
-    });
-  }
-  res.redirect('/');
 
+  var db = "UPDATE product SET product_name = '" + req.body.product_name + "', band_name = '" + req.body.band_name + "' , price = '" + req.body.price + "',product_des = '" + req.body.product_des + "',image = '" + suff + ".png" + "' WHERE product_id = '" + req.params.productId + "'"
+  sql.query(db, function (err, result) {
+    console.log(db);
+    console.log(result);
+  });
+
+res.redirect('/');
+
+});
+
+app.delete('/products/:productId', multerSigleUpload.single('image'), (req, res) => {
+  var db = "delete from orderdetail_has_product where product_product_id='" + req.params.productId + "'"
+  sql.query(db, function (err, result) {
+    console.log(db);
+    console.log(result);
+  });
+  var db1 = "delete from product where product_id='" + req.params.productId + "'"
+  sql.query(db1, function (err, result) {
+    console.log(db1);
+    console.log(result);
+  });
+  res.redirect('/');
 });
 
 app.delete('/products/:productId', multerSigleUpload.single('image'), (req, res) => {
@@ -239,9 +238,29 @@ app.get('/getuser', multerSigleUpload.single('image'), (req, res, next) => {
     }
     sql.query('SELECT * FROM user where user_id=?', decoded.id, function (error, results) {
       if (error) throw error;
-      res.send({ data: results[0], message: 'Fetch Successfully.' });
+      res.send({ data: results[0]});
     });
   }
+});
+
+app.put('/updateuserinfo/:userid', multerSigleUpload.single('image'), function (req, res) {
+  var db = "UPDATE user SET name = '"+ req.body.name +"', phonenumber = '"+ req.body.phonenumber+"', DOB = '"+ req.body.DOB + "', address = '"+ req.body.address + "' WHERE user_id = '" + req.params.userid + "'";
+            sql.query(db, function (err, result) {
+              console.log('inserted data');
+              console.log(db);
+              console.log(result);
+            });
+    res.redirect('/');
+});
+
+app.delete('/deleteuserinfo/:userid', multerSigleUpload.single('image'), function (req, res) {
+  var db = "Delete from user where user_id = '" + req.params.userid + "'";
+            sql.query(db, function (err, result) {
+              console.log('inserted data');
+              console.log(db);
+              console.log(result);
+            });
+    res.redirect('/');
 });
 
 app.post('/clearuser', multerSigleUpload.single('image'), (req, res, next) => {
@@ -258,18 +277,16 @@ app.post('/checkout', multerSigleUpload.single('image'), (req, res, next) => {
     if (!decoded) {
       return res.status(401).send("unauthebtucated")
     }
-    var db = "select order_id from orderdetail where order_id=(select max(order_id) from orderdetail);"
-    sql.query(db, function (err, result) {
-      console.log(db);
-      console.log(result);
-      var db2 = "INSERT INTO `orderdetail`( `order_price`, `order_quantity`,`user_user_id`) VALUES ('" + req.body.order_price + "', '" + req.body.order_quantity + "','" + decoded.id + "')";
+      var db2 = "INSERT INTO orderdetail( order_price, order_quantity,user_user_id) VALUES ('" + req.body.order_price + "', '" + req.body.order_quantity + "','" + decoded.id + "')";
       sql.query(db2, function (err, result2) {
         console.log(db2);
         console.log(result2);
       });
+      var db = "select order_id from orderdetail where order_id=(select max(order_id) from orderdetail);"
+      sql.query(db, function (err, result) {
       var plus = result[0].order_id + 1;
       var a = req.body.order_price * req.body.order_quantity
-      var db1 = "INSERT INTO `orderdetail_has_product`(`orderDetail_order_id`, `product_product_id`, `total_price_product_id`,`total_quantity_product_id`) VALUES ('" + plus + "','" + req.body.product_id + "', '" + a + "','" + req.body.order_quantity + "')";
+      var db1 = "INSERT INTO orderdetail_has_product(orderDetail_order_id, product_product_id, total_price_product_id,total_quantity_product_id) VALUES ('" + result[0].order_id + "','" + req.body.product_id + "', '" + a + "','" + req.body.order_quantity + "')";
       sql.connect((err) => {
         sql.query(db1, function (err, result1) {
           console.log(db1);
@@ -297,12 +314,11 @@ app.delete('/checkoutdelete/:delete1', multerSigleUpload.single('image'), (req, 
 });
 
 app.put('/checkoutedit/:editid', multerSigleUpload.single('image'), (req, res, next) => {
-  var db = "UPDATE orderdetail SET  order_quantity = '"+ req.body.order_quantity +"' WHERE order_id = " + req.params.editid
+  var db = "UPDATE orderdetail SET  order_quantity = '" + req.body.order_quantity + "' WHERE order_id = " + req.params.editid
   sql.query(db, function (err, result) {
     console.log(db);
     console.log(result);
-    var plus = req.body.order_quantity * req.body.order_price
-    var db2 = "UPDATE orderDetail_has_product SET  total_quantity_product_id = '"+ req.body.order_quantity + "' AND total_price_product_id ='"+ plus +"' WHERE orderDetail_order_id =" + req.params.editid
+    var db2 = "UPDATE orderDetail_has_product SET  total_quantity_product_id = '" + req.body.order_quantity + "' , total_price_product_id ='" + req.body.total_price_product_id + "' WHERE (orderDetail_order_id = '" + req.params.editid + "')"
     sql.query(db2, function (err, result2) {
       console.log(db2);
       console.log(result2);
@@ -342,6 +358,13 @@ app.post('/checkout', multerSigleUpload.single('image'), (req, res, next) => {
     });
   }
   res.redirect('/');
+});
+
+app.get('/getalluser', signupValidation, multerSigleUpload.single('image'), function (req, res) {
+  var db = "SELECT * FROM user"
+  sql.query(db, function (err , result){
+    res.send(result);
+  })
 });
 
 app.get('/getcheckout', multerSigleUpload.single('image'), (req, res, next) => {
