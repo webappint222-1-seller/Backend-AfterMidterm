@@ -191,9 +191,10 @@ app.post('/login', loginValidation, multerSigleUpload.single('image'), function 
           var token = jwt.sign({ id: result1[0].user_id }, 'secrect', { expiresIn: '1d' });
           console.log(token);
           res.cookie('jwt', token, { maxAge: 24 * 60 * 60 * 1000 });
-          res.status(200).json("pass");
+          res.status(200).json({data: 1});
+                  
         } else {
-          res.status(401).json("email or password is wrong")
+          res.status(401).json({data: 0})  
         }
       });
     });
@@ -394,9 +395,6 @@ app.get('/getcheckoutbyid', multerSigleUpload.single('image'), (req, res, next) 
     });
 });
 
-
-
-
 app.post('/orderhasproduct', multerSigleUpload.single('image'), (req, res, next) => {
   // const theCookie = req.cookies['jwt'];
   // const decoded = jwt.verify(theCookie, 'secrect');
@@ -407,6 +405,14 @@ app.post('/orderhasproduct', multerSigleUpload.single('image'), (req, res, next)
     console.log(result);
   });
   res.redirect('/');
+});
+
+app.post('/searchproduct', multerSigleUpload.single('image') ,function (req, res) {
+  var db = "SELECT * FROM product WHERE product_name LIKE LOWER('%"+ req.body.product_name + "%');"
+  sql.query(db, function (err , result){
+    console.log(db);
+    res.send(result);
+  })
 });
 
 const PORT = process.env.PORT || 3006;
